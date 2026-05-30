@@ -37,7 +37,12 @@
 #include <pthread.h>
 #include <getopt.h>
 #include <math.h>
-#include <x86intrin.h>
+/* Only the SSE2/SSSE3 intrinsics are used. Including the <x86intrin.h>
+   umbrella header pulls in CRC32/RAO/MMX intrinsics that recent Clang
+   releases fail to compile when targeting x86_64, so include just what
+   is needed. */
+#include <emmintrin.h>
+#include <tmmintrin.h>
 
 #ifdef MPISWIPE
 #include <mpi.h>

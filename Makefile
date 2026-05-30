@@ -30,7 +30,9 @@ MPI_LINK=`mpicxx --showme:link`
 COMMON=-g
 #COMMON=-pg -g
 
-COMPILEOPT=-Wall
+# SWIPE uses SSE2/SSSE3 intrinsics, so the binary must target x86_64.
+# The -msse2 -mssse3 -mmmx flags expose the intrinsics on recent compilers.
+COMPILEOPT=-Wall -std=c++20 -msse2 -mssse3 -mmmx
 
 LIBS=-lpthread
 
@@ -39,13 +41,20 @@ LIBS=-lpthread
 #CXXFLAGS=$(COMPILEOPT) $(COMMON) -Wno-missing-declarations -fast
 #LINKFLAGS=$(COMMON)
 
-# GNU options
-CXX=g++
+# GNU/Linux options (native x86_64)
+#CXX=g++
+#CXXFLAGS=$(COMPILEOPT) $(COMMON) -O3
+#LINKFLAGS=$(COMMON)
+
+# Apple options (build an x86_64 binary; runs under Rosetta on Apple silicon)
+CXX=clang++ -arch x86_64
 CXXFLAGS=$(COMPILEOPT) $(COMMON) -O3
 LINKFLAGS=$(COMMON)
 
-PROG=swipe mpiswipe
+PROG=swipe
 
+# The optional MPI build (mpiswipe) is not built by default; run `make mpiswipe`
+# in an MPI environment if you need it.
 all : $(PROG)
 
 clean :
