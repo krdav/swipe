@@ -116,6 +116,7 @@ extern long maxmatches;
 extern long threads;
 extern const char * databasename;
 extern long alignments;
+extern long best_only;
 extern long queryno;
 extern long compute7;
 extern long show_taxid;
@@ -357,6 +358,7 @@ void hits_enter(long seqno, long score, long qstrand, long qframe,
 		long dstrand, long dframe, long align_hint, long bestq);
 long * hits_sort();
 long hits_getcount();
+void hits_calc_bestcount();
 void hits_align(struct db_thread_s * t, long i);
 void hits_show_begin(long view);
 void hits_show_end(long view);

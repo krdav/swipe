@@ -50,6 +50,7 @@
 #define DEFAULT_DB_GENCODE 1
 #define DEFAULT_SUBALIGNMENTS 1
 #define DEFAULT_DUMP 0
+#define DEFAULT_BEST_ONLY 0
 #define DEFAULT_OUT stdout
 #define DEFAULT_EFFDBSIZE 0
 
@@ -72,6 +73,7 @@ long threads;
 long view;
 long symtype;
 long show_gis;
+long best_only;
 long show_taxid;
 long matchscore;
 long mismatchscore;
@@ -811,6 +813,7 @@ void args_usage()
   fprintf(out, "  -x, --taxidlist=FILE       taxid list filename (none)\n");
   fprintf(out, "  -N, --dump=NUM             dump database [0-2=no,yes,split headers] (0)\n");
   fprintf(out, "  -H, --show_taxid           show taxid etc in results (no)\n");
+  fprintf(out, "  -B, --best_only            report only the best-scoring hit(s) per query (no)\n");
   fprintf(out, "  -o, --out=FILE             output file (stdout)\n");
   fprintf(out, "  -z, --dbsize=NUM           set effective database size (0)\n");
 }
@@ -852,11 +855,12 @@ void args_init(int argc, char **argv)
   subalignments = DEFAULT_SUBALIGNMENTS;
   dump = DEFAULT_DUMP;
   effdbsize = DEFAULT_EFFDBSIZE;
+  best_only = DEFAULT_BEST_ONLY;
 
   progname = argv[0];
 
   opterr = 1;
-  char short_options[] = "d:i:M:q:r:G:E:S:v:b:c:u:e:k:a:m:p:x:C:Q:D:F:K:N:o:z:IHh";
+  char short_options[] = "d:i:M:q:r:G:E:S:v:b:c:u:e:k:a:m:p:x:C:Q:D:F:K:N:o:z:IHhB";
 
   static struct option long_options[] =
   {
@@ -888,6 +892,7 @@ void args_init(int argc, char **argv)
     {"dbsize",           required_argument, NULL, 'z' },
     {"show_gis",         no_argument,       NULL, 'I' },
     {"show_taxid",       no_argument,       NULL, 'H' },
+    {"best_only",        no_argument,       NULL, 'B' },
     {"help",             no_argument,       NULL, 'h' },
     { 0, 0, 0, 0 }
   };
@@ -913,6 +918,11 @@ void args_init(int argc, char **argv)
 	  alignments = atol(optarg);
 	  break;
 	  
+	case 'B':
+	  /* report only the best-scoring hit(s) per query */
+	  best_only = 1;
+	  break;
+
 	case 'c':
 	  /* min score threshold */
 	  minscore = atol(optarg);
@@ -2460,13 +2470,17 @@ void work()
   clock_start(&ti);
   
   run_threads();
- 
+
 #if 1
   if (view == 0)
     fprintf(out, "...............................................done\n\n");
 #endif
- 
+
   clock_stop(&ti);
+
+  /* Determine how many top hits tie for the best score; with --best_only
+     only those are aligned and reported. */
+  hits_calc_bestcount();
 
 #if 0
   if (view == 0)

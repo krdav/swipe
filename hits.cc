@@ -543,6 +543,30 @@ void hits_exit()
   hits_list = 0;
 }
 
+/* Number of leading (highest-scoring) hits that tie for the best score.
+   Used only when --best_only is given: in that mode swipe aligns and reports
+   exclusively the best-scoring hit(s) per query and skips the traceback and
+   output for lower-scoring hits, which is wasted work for callers that keep
+   only the best hit. hits_list is kept sorted by descending score (see
+   hits_enter), so the best hits are the leading run with the top score. */
+long bestcount = 0;
+
+void hits_calc_bestcount()
+{
+  bestcount = 0;
+  if (hits_count > 0)
+  {
+    long best = hits_list[0].score;
+    while ((bestcount < hits_count) && (hits_list[bestcount].score == best))
+      bestcount++;
+  }
+  /* Never report/align more than the user-requested limits. */
+  if (bestcount > opt_alignments)
+    bestcount = opt_alignments;
+  if (bestcount > opt_descriptions)
+    bestcount = opt_descriptions;
+}
+
 void hits_align(struct db_thread_s * t, long i)
 {
   char * address;
@@ -557,7 +581,10 @@ void hits_align(struct db_thread_s * t, long i)
   h->header_address = (char*) xmalloc(length);
   memcpy(h->header_address, address, length);
 
-  if (i < opt_alignments)
+  /* With --best_only, compute the full Smith-Waterman traceback only for the
+     best-scoring hit(s) (see bestcount); otherwise behave as upstream and
+     align the top opt_alignments hits. */
+  if (i < (best_only ? bestcount : opt_alignments))
   {
     db_mapsequences(t, h->seqno, h->seqno);
     
@@ -2002,7 +2029,19 @@ void hits_show(long view, long show_gis)
     showalignments = hits_count;
   else
     showalignments = opt_alignments;
-  
+
+  /* With --best_only, restrict output to the best-scoring hit(s) (see
+     bestcount). This must match exactly what hits_align computed a traceback
+     for, otherwise an unaligned hit would be reported. Without the flag the
+     upstream behaviour is preserved exactly. */
+  if (best_only)
+  {
+    if (showhits > bestcount)
+      showhits = bestcount;
+    if (showalignments > bestcount)
+      showalignments = bestcount;
+  }
+
   struct db_thread_s * t = db_thread_create();
 
   if(view == 0)
