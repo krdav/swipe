@@ -359,6 +359,7 @@ void hits_enter(long seqno, long score, long qstrand, long qframe,
 long * hits_sort();
 long hits_getcount();
 void hits_calc_bestcount();
+extern long bestcount;
 void hits_align(struct db_thread_s * t, long i);
 void hits_show_begin(long view);
 void hits_show_end(long view);

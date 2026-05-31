@@ -1753,6 +1753,47 @@ void hits_show_xml(long show_gis,
   fprintf(out, "</result>\n");
 }
 
+void hits_show_compact(long show_gis,
+		       long showalignments,
+		       long showhits,
+		       struct db_thread_s * t)
+{
+  /* Compact, line-oriented output for fast downstream parsing. One
+     tab-separated line per reported hit:
+
+       query <TAB> score <TAB> name <TAB> qstart,qend <TAB> dstart,dend \
+             <TAB> qseq <TAB> aseq <TAB> dseq
+
+     Queries with no reported hits produce no lines. This carries exactly the
+     same per-hit data as the outfmt 7 XML (<query>/<score>/<name>/<qpos>/
+     <dpos>/<qseq>/<aseq>/<dseq>) without the markup, and is intended for use
+     with --best_only, where only the best-scoring hit(s) are reported. */
+
+  (void) showhits;
+
+  for(long i=0; i<showalignments; i++)
+  {
+    long score = hits_list[i].score;
+    long identities, positives, gaps, aligned, indels;
+    char *qline, *aline, *dline;
+
+    whole_align(i, & identities, & positives, & indels, & aligned, & gaps,
+		& qline, & aline, & dline);
+
+    show_description(query.description);
+    fprintf(out, "\t%ld\t", score);
+    db_showheader(t, hits_list[i].header_address,
+		  hits_list[i].header_length,
+		  show_gis, 0, 0, LONG_MAX, 1, 1);
+    fprintf(out, "\t%ld,%ld\t%ld,%ld\t%s\t%s\t%s\n",
+	    q_first, q_last, d_first, d_last, qline, aline, dline);
+
+    free(qline);
+    free(aline);
+    free(dline);
+  }
+}
+
 void hits_show_tsv(long showalignments,
 		   long showcomments,
 		   struct db_thread_s * t)
@@ -2059,6 +2100,10 @@ void hits_show(long view, long show_gis)
   else if (view==99)
   {
     hits_show_xml_paralign(showalignments, showhits, t);
+  }
+  else if (view==10)
+  {
+    hits_show_compact(show_gis, showalignments, showhits, t);
   }
   db_thread_destruct(t);
 }

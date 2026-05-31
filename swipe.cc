@@ -352,8 +352,14 @@ void align_chunk(struct search_data * sdp, long hitfirst, long hitlast)
 	{
 	  long hs = hits_sorted[hitno];
 	  long seqno, score, hqstrand, hqframe, hdstrand, hdframe;
-	
-	  hits_gethit(hs, & seqno, & score, & hqstrand, & hqframe, 
+
+	  /* With --best_only only the best-scoring hit(s) are aligned, so the
+	     alignment-end hint is only needed for them (hits_list is score
+	     sorted, so best hits have index < bestcount). */
+	  if (best_only && (hs >= bestcount))
+	    continue;
+
+	  hits_gethit(hs, & seqno, & score, & hqstrand, & hqframe,
 		      & hdstrand, & hdframe);
 
 	  if ((qstrand == hqstrand) && (qframe == hqframe))
@@ -412,7 +418,14 @@ void align_chunk(struct search_data * sdp, long hitfirst, long hitlast)
   }
 
   for(long hitno = hitfirst; hitno <= hitlast; hitno++)
+  {
+    /* With --best_only, skip lower-scoring hits entirely: they are neither
+       aligned (hits_align) nor reported (hits_show), so fetching their
+       headers is wasted work. */
+    if (best_only && (hits_sorted[hitno] >= bestcount))
+      continue;
     hits_align(sdp->dbt, hits_sorted[hitno]);
+  }
 }
 
 void align_done(struct search_data * sdp)
@@ -633,13 +646,22 @@ void align_threads()
   void * status;
 
   align_threads_init();
-  
+
+  /* Single thread: run inline, avoiding a pthread create+join per query
+     (see run_threads). */
+  if (threads == 1)
+  {
+    align_worker((void *) 0);
+    align_threads_done();
+    return;
+  }
+
   for(t=0; t<threads; t++)
     {
       if (pthread_create(pthread_id + t, 0, align_worker, (void *)t))
 	fatal("Cannot create thread.");
     }
-  
+
   for(t=0; t<threads; t++) {
     if (pthread_join(pthread_id[t], &status))
       fatal("Cannot join thread.");
@@ -804,7 +826,7 @@ void args_usage()
   fprintf(out, "  -c, --min_score=NUM        minimum score of sequences to show (1)\n");
   fprintf(out, "  -u, --max_score=NUM        maximum score of sequences to show (inf.)\n");
   fprintf(out, "  -a, --num_threads=NUM      number of threads to use [1-%d] (1)\n", MAX_THREADS);
-  fprintf(out, "  -m, --outfmt=NUM           output format [0,7-9=plain,xml,tsv,tsv+] (0)\n");
+  fprintf(out, "  -m, --outfmt=NUM           output format [0,7-9,10=plain,xml,tsv,tsv+,compact] (0)\n");
   fprintf(out, "  -I, --show_gis             show gi numbers in results (no)\n");
   fprintf(out, "  -p, --symtype=NAME/NUM     symbol type/translation [0-4] (1)\n");
   fprintf(out, "  -S, --strand=NAME/NUM      query strands to search [1-3] (3)\n");
@@ -1144,7 +1166,7 @@ void args_init(int argc, char **argv)
   if (strlen(databasename) == 0)
     fatal("No database specified.");
   
-  if (!((view==0)||(view==7)||(view==8)||(view==9)||(view==99)))
+  if (!((view==0)||(view==7)||(view==8)||(view==9)||(view==10)||(view==99)))
     fatal("Illegal view type.");
   
   if ((gapopen < 0) || (gapextend < 0) || ((gapopen + gapextend) < 1))
@@ -1696,12 +1718,22 @@ void run_threads()
   long t;
   void * status;
 
+  /* For a single thread, run the work loop directly on the calling thread.
+     This workload (many short queries vs. a small database) re-enters
+     run_threads once per query, so avoiding a pthread create+join per query
+     removes a large amount of per-query overhead. */
+  if (threads == 1)
+  {
+    worker((void *) 0);
+    return;
+  }
+
   for(t=0; t<threads; t++)
     {
       if (pthread_create(pthread_id + t, 0, worker, (void *)t))
 	fatal("Cannot create thread.");
     }
-  
+
   for(t=0; t<threads; t++) {
     if (pthread_join(pthread_id[t], &status))
       fatal("Cannot join thread.");
