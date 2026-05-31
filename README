@@ -7,7 +7,13 @@ hit(s) (all hits tied for the top score) instead of the top --num_alignments
 hits. SWIPE then skips the Smith-Waterman traceback and output for the
 lower-scoring hits, which speeds up searches and shrinks the output for callers
 that keep only the best hit per query. Without the flag the behaviour is
-identical to upstream. See "Usage" below or run `swipe --help`.
+identical to upstream.
+
+The fork also adds a compact tab-separated output format (--outfmt 10), one
+line per reported hit (query, score, name, qstart,qend, dstart,dend, qseq,
+aseq, dseq), and runs single-threaded searches (--num_threads 1) inline to
+avoid per-query thread overhead when searching many short queries against a
+small database. See "Usage" below or run `swipe --help`.
 
 
 Copyright (C) 2008-2021 Torbjorn Rognes, University of Oslo,
